@@ -192,10 +192,7 @@ class mk_mpnn_model():
 
   def _get_score(self, inputs_S, logits, mask, fix_pos=None): # Pass necessary inputs directly
     ''' logits to score/sequence_recovery - JAX compatible version '''
-    # inputs_S is the original sequence (numerical)
-    # logits are the model output logits
-    # mask is the original mask
-    # fix_pos are indices to ignore in scoring
+
 
     current_mask = mask
     if fix_pos is not None and fix_pos.shape[0] > 0: # Ensure fix_pos is not empty
@@ -212,8 +209,7 @@ class mk_mpnn_model():
     
     score = -(S_scored_one_hot * log_q).sum(-1)
 
-    seqid = jnp.argmax(logits[...,:20], axis=-1) == self._inputs["S"] 
-
+    seqid = (inputs_S == self._inputs["S"])
 
     masked_score_sum = (score * current_mask).sum(-1)
     masked_seqid_sum = (seqid * current_mask).sum(-1)
