@@ -1,4 +1,10 @@
-# ColabDesign
+# ColabDesign (EXPERIMENTAL justktln2 REMIX)
+
+The only modification to the forked branch has been to introduce I/O for MDTraj and vectorize ProteinMPNN sampling across trajectories.
+The important parts of this will be refactored and folded into either [ciMIST](https://github.com/justktln2/ciMIST/) or ColabDesign.
+
+Original README follows.
+
 ### Making Protein Design accessible to all via Google Colab! 
 - P(structure | sequence)
   - [TrDesign](/tr) - using TrRosetta for design
