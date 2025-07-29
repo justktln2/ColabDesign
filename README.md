@@ -4,7 +4,7 @@ The only modification to the forked branch has been to introduce I/O with MDTraj
 You will therefore need to install MDTraj to use this.
 The important parts of this will be refactored and folded into either [ciMIST](https://github.com/justktln2/ciMIST/) or ColabDesign.
 
-Original README follows.
+Original README, which I had nothing to do with, follows.
 
 ### Making Protein Design accessible to all via Google Colab! 
 - P(structure | sequence)
