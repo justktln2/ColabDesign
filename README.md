@@ -1,6 +1,7 @@
 # ColabDesign (EXPERIMENTAL justktln2 REMIX)
 
-The only modification to the forked branch has been to introduce I/O for MDTraj and vectorize ProteinMPNN sampling across trajectories.
+The only modification to the forked branch has been to introduce I/O with MDTraj and vectorize ProteinMPNN sampling across trajectories.
+You will therefore need to install MDTraj to use this.
 The important parts of this will be refactored and folded into either [ciMIST](https://github.com/justktln2/ciMIST/) or ColabDesign.
 
 Original README follows.
