@@ -1,3 +1,8 @@
+"""
+ProteinMPNN adapted to molecular dynamics trajectories.
+
+"""
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -15,6 +20,7 @@ from scipy.special import softmax, log_softmax
 
 from colabdesign.shared.prep import prep_pos
 from colabdesign.shared.utils import Key, copy_dict
+from colabdesign.shared.chunked_vmap import vmap_chunked as cvmap
 
 # borrow some stuff from AfDesign
 from colabdesign.af.prep import prep_pdb
@@ -26,7 +32,7 @@ class mk_mpnn_ensemble_model():
   def __init__(self, model_name="v_48_020",
                backbone_noise=0.0, dropout=0.0,
                seed=None, verbose=False, weights="original", # weights can be set to either original or soluble
-               ): 
+               batch_size=1000): 
 
     # load model
     if weights == "original":
@@ -50,12 +56,12 @@ class mk_mpnn_ensemble_model():
     
     self._model = RunModel(config)
     self._model.params = jax.tree_util.tree_map(np.array, checkpoint['model_state_dict'])
-    self._setup()
+    self.batch_size = batch_size
     self.set_seed(seed)
-
     self._num = 1
     self._inputs = {}
     self._tied_lengths = False
+    self._setup()
 
   def prep_inputs(
         self,
@@ -75,13 +81,15 @@ class mk_mpnn_ensemble_model():
             raise ValueError(
                 "One of 'mdtraj_frame', 'pdb_filename', or 'pdb_string' must be provided."
             )
+        
+        # atom idx
         atom_idx = tuple(residue_constants.atom_order[k] for k in ["N", "CA", "C", "O"])
         chain_idx = np.concatenate([[n] * l for n, l in enumerate(traj["lengths"])])
         self._lengths = traj["lengths"]
         L = sum(self._lengths)
 
         self._inputs = {
-            "X": traj["batch"]["all_atom_positions"][:, atom_idx], # fine to keep as is
+            "X": traj["batch"]["all_atom_positions"][:, :, atom_idx], # atom_idx_moved_back_one
             "mask": traj["batch"]["all_atom_mask"][:, 1],
             "S": traj["batch"]["aatype"],
             "residue_idx": traj["residue_index"],
@@ -171,11 +179,23 @@ class mk_mpnn_ensemble_model():
       O = self._rescore_parallel(keys, I, O["S"], O["decoding_order"])
 
     # must squeeze here, unlike regular model
-    O = jax.tree_util.tree_map(lambda x: np.squeeze(np.array(x)), O)
+    O = jax.tree_util.tree_map(lambda x: jnp.squeeze(jnp.array(x)), O)
 
     # process outputs to human-readable form
     O.update(self._get_seq(O))
     O.update(self._get_score(I,O))
+    return O
+
+  def sample_minimal(self, temperature=0.1, rescore=False, **kwargs):
+    '''Sample one sequence for each conformer'''
+    I = copy_dict(self._inputs)
+    I.update(kwargs)
+    key = I.pop("key",self.key())
+    keys = jax.random.split(key,1)
+    O = self._sample_conformers(keys, I, temperature, self._tied_lengths)
+
+    # must squeeze here, unlike regular model
+    O = jax.tree_util.tree_map(lambda x: jnp.squeeze(jnp.array(x)), O)
     return O
 
   def sample_parallel(self, batch=10, temperature=0.1, rescore=False, **kwargs):
@@ -462,7 +482,7 @@ class mk_mpnn_ensemble_model():
             temperature=temperature, tied_lengths=tied_lengths), static_argnames=["tied_lengths"]
             )
             # vmap over positions
-            return jax.vmap(f_of_X, in_axes=-1, out_axes=-1)(inputs_copy["X"])
+            return cvmap(f_of_X, chunk_size=min(self.batch_size, inputs_copy["X"].shape[0]))(inputs_copy["X"])
 
         # this is vmap over keys, but there's only one.
         # this is just the easiest way to square with earliest code
@@ -471,6 +491,7 @@ class mk_mpnn_ensemble_model():
         # difference, no jit for now  
         self._sample_conformers = fn_vmap_sample_conformers
 
+        @jax.jit
         def _vmap_rescore_parallel(key, inputs, S_rescore, decoding_order_rescore):
             inputs_copy = dict(inputs)  # Shallow copy
             inputs_copy.pop("S", None)
@@ -480,9 +501,8 @@ class mk_mpnn_ensemble_model():
             return self._score(
                 **inputs_copy, key=key, S=S_rescore, decoding_order=decoding_order_rescore
             )  # Pass S and decoding_order
-
         fn_vmap_rescore = jax.vmap(_vmap_rescore_parallel, in_axes=[0, None, 0, 0])
-        self._rescore_parallel = jax.jit(fn_vmap_rescore)
+        self._rescore_parallel = fn_vmap_rescore
 
 #######################################################################################
 

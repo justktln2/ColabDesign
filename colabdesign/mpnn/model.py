@@ -21,7 +21,8 @@ order_aa = {b:a for a,b in aa_order.items()}
 class mk_mpnn_model():
   def __init__(self, model_name="v_48_020",
                backbone_noise=0.0, dropout=0.0,
-               seed=None, verbose=False, weights="original"): # weights can be set to either original or soluble
+               seed=None, verbose=False, weights="original",
+               batch_size=1000): # weights can be set to either original or soluble
     # load model
     if weights == "original":
       from .weights import __file__ as mpnn_path
@@ -50,6 +51,7 @@ class mk_mpnn_model():
     self._num = 1
     self._inputs = {}
     self._tied_lengths = False
+    self.batch_size
 
   def prep_inputs(self, pdb_filename=None, chain=None, homooligomer=False,
                   ignore_missing=True, fix_pos=None, inverse=False,
@@ -376,9 +378,9 @@ class mk_mpnn_model():
         inputs_copy.pop("temperature",None)
         inputs_copy.pop("key",None)
         # Ensure 'bias' is correctly handled if it's part of 'inputs'
-        return self._sample(**inputs_copy, key=key, temperature=temperature, tied_lengths=tied_lengths)
+        return self._sample(**inputs_copy, key=key, temperature=temperature, tied_lengths=tied_lengths, batch_size=self.batch_size)
     
-    fn_vmap_sample = jax.vmap(_vmap_sample_parallel, in_axes=[0,None,None,None])
+    fn_vmap_sample = jax.lax.map(_vmap_sample_parallel, in_axes=[0,None,None,None])
     self._sample_parallel = jax.jit(fn_vmap_sample, static_argnames=["tied_lengths"])
 
     def _vmap_rescore_parallel(key, inputs, S_rescore, decoding_order_rescore):
@@ -389,7 +391,7 @@ class mk_mpnn_model():
         # Ensure 'bias' from original inputs is used, and S_rescore is the new S
         return self._score(**inputs_copy, key=key, S=S_rescore, decoding_order=decoding_order_rescore) # Pass S and decoding_order
 
-    fn_vmap_rescore = jax.vmap(_vmap_rescore_parallel, in_axes=[0,None,0,0])
+    fn_vmap_rescore = jax.lax.map(_vmap_rescore_parallel, in_axes=[0,None,0,0])
     self._rescore_parallel = jax.jit(fn_vmap_rescore)
 
 #######################################################################################

@@ -72,7 +72,7 @@ def prep_from_mdtraj(traj, chain=None, **kwargs):
             m[:, cb_idx, None], p[..., cb_idx, :], cb_atoms
         )
         batch["all_atom_mask"][..., cb_idx] = (m[:, cb_idx] + cb_mask) > 0
-        batch["all_atom_positions"] = np.moveaxis(batch["all_atom_positions"], 0, -1)
+        #batch["all_atom_positions"] = np.moveaxis(batch["all_atom_positions"], 0, -1)
 
         chain_data = {
             "batch": batch,
