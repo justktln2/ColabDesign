@@ -88,8 +88,9 @@ def prep_from_mdtraj(traj, chain=None, **kwargs):
     if not all_chains_data:
         raise ValueError("No valid chains found or processed from the mdtraj frame.")
 
+    # the one with 4 dimensions is mapped of axis=1, this will be the coordinates
     final_batch = jax.tree_util.tree_map(
-        lambda *x: np.concatenate(x, 0), *[d.pop("batch") for d in all_chains_data]
+        lambda *x: np.concatenate(x, int(len(x[0].shape)==4)), *[d.pop("batch") for d in all_chains_data]
     )
     final_residue_index = np.concatenate([d.pop("residue_index") for d in all_chains_data])
     final_idx = {
