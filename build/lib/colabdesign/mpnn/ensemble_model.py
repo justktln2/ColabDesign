@@ -32,7 +32,7 @@ class mk_mpnn_ensemble_model():
   def __init__(self, model_name="v_48_020",
                backbone_noise=0.0, dropout=0.0,
                seed=None, verbose=False, weights="original", # weights can be set to either original or soluble
-               batch_size=1000): 
+               batch_size=500): 
 
     # load model
     if weights == "original":
